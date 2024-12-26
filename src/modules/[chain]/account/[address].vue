@@ -170,20 +170,20 @@ function mapAmount(events:{type: string, attributes: {key: string, value: string
               @click="dialog.open('send', {}, updateEvent)"
               >{{ $t('account.btn_send') }}</label
             >
-            <label
-              for="transfer"
-              class="btn btn-primary btn-sm"
-              @click="
-                dialog.open(
-                  'transfer',
-                  {
-                    chain_name: blockchain.current?.prettyName,
-                  },
-                  updateEvent
-                )
-              "
-              >{{ $t('account.btn_transfer') }}</label
-            >
+<!--            <label-->
+<!--              for="transfer"-->
+<!--              class="btn btn-primary btn-sm"-->
+<!--              @click="-->
+<!--                dialog.open(-->
+<!--                  'transfer',-->
+<!--                  {-->
+<!--                    chain_name: blockchain.current?.prettyName,-->
+<!--                  },-->
+<!--                  updateEvent-->
+<!--                )-->
+<!--              "-->
+<!--              >{{ $t('account.btn_transfer') }}</label-->
+<!--            >-->
           </div>
       </div>
       <div class="grid md:!grid-cols-3">
