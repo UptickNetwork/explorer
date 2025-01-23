@@ -11,7 +11,6 @@
 [![Twitter URL](https://img.shields.io/twitter/url/https/twitter.com/bukotsunikki.svg?style=social&label=Follow%20%40ping_pub)](https://twitter.com/ping_pub)
 [![https://discord.gg/CmjYVSr6GW](https://img.shields.io/badge/discord-join-7289DA.svg?logo=discord&longCache=true&style=flat)](https://discord.gg/CmjYVSr6GW)
 
-
 </div>
 
 `Ping Dashboard` is a light explorer for Cosmos-based Blockchains.  https://ping.pub .
