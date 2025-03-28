@@ -49,7 +49,6 @@ Your donation will help us make better products. Thanks in advance.
 
 You can hire us by submitting an issue and fund the issue on [IssueHunter](https://issuehunt.io/r/ping-pub/explorer)
 
-
 ## Contributors
 
 Developers: @liangping @dingyiming
