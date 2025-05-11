@@ -53,5 +53,3 @@ You can hire us by submitting an issue and fund the issue on [IssueHunter](https
 
 Developers: @liangping @dingyiming
 
-
-
