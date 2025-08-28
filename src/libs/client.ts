@@ -287,9 +287,9 @@ export class CosmosRestClient extends BaseRestClient<RequestRegistry> {
 
     let query = `?events=message.sender='${sender}'&pagination.limit=${page.limit}&pagination.offset=${
       page.offset || 0
-    }`;
+    }&order_by=2`;
     if (semver.gte(this.version.replaceAll('v', ''), '0.50.0')) {
-      query = `?query=message.sender='${sender}'&pagination.limit=${page.limit}&pagination.offset=${page.offset || 0}`;
+      query = `?query=message.sender='${sender}'&pagination.limit=${page.limit}&pagination.offset=${page.offset || 0}&order_by=2`;
     }
     return this.request(this.registry.tx_txs, {}, query);
   }
