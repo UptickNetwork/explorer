@@ -20,6 +20,7 @@ let height = ref('');
 let round = ref('');
 let step = ref('');
 let timer = null as any;
+let loading = false;
 let updatetime = ref(new Date());
 let positions = ref([]);
 let validatorsData = ref([] as any);
@@ -36,6 +37,7 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   clearTime();
+  loading = false;
 });
 
 function clearTime() {
@@ -80,15 +82,21 @@ function color(i: number, txt: string) {
   return txt === 'nil-Vote' ? 'gray-700' : 'success';
 }
 async function onChange() {
+  if (loading) return;
+  loading = true;
   httpstatus.value = 200;
   httpStatusText.value = '';
   roundState.value = {};
   clearTime();
-  await fetchPosition();
-  update();
-  timer = setInterval(() => {
+  try {
+    await fetchPosition();
     update();
-  }, Math.round(baseStore.blocktime / 2));
+    timer = setInterval(() => {
+      update();
+    }, Math.round(baseStore.blocktime / 2));
+  } finally {
+    loading = false;
+  }
 }
 
 async function fetchPosition() {
@@ -179,7 +187,7 @@ async function update() {
             <span class="text-md">{{ $t('consensus.onboard_rate') }}</span>
           </div>
           <div class="avatar placeholder">
-            <div class="bg-rose-100 text-neutral-content rounded-full w-12 h-12">
+            <div class="bg-error/10 rounded-full w-12 h-12">
               <span class="text-2xl text-error font-semibold">{{ $t('consensus.o') }}</span>
             </div>
           </div>
@@ -191,7 +199,7 @@ async function update() {
             <span class="text-md">{{ $t('account.height') }}</span>
           </div>
           <div class="avatar placeholder">
-            <div class="bg-green-100 text-neutral-content rounded-full w-12 h-12">
+            <div class="bg-success/10 rounded-full w-12 h-12">
               <span class="text-2xl text-success font-semibold">{{ $t('consensus.h') }}</span>
             </div>
           </div>
@@ -203,7 +211,7 @@ async function update() {
             <span class="text-md">{{ $t('consensus.round') }}</span>
           </div>
           <div class="avatar placeholder">
-            <div class="bg-violet-100 text-neutral-content rounded-full w-12 h-12">
+            <div class="bg-primary/10 rounded-full w-12 h-12">
               <span class="text-2xl text-primary font-semibold">{{ $t('consensus.r') }}</span>
             </div>
           </div>
@@ -215,7 +223,7 @@ async function update() {
             <span class="text-md">{{ $t('consensus.step') }}</span>
           </div>
           <div class="avatar placeholder">
-            <div class="bg-blue-100 text-neutral-content rounded-full w-12 h-12">
+            <div class="bg-info/10 rounded-full w-12 h-12">
               <span class="text-2xl text-info font-semibold">{{ $t('consensus.s') }}</span>
             </div>
           </div>
@@ -247,8 +255,8 @@ async function update() {
                     class="tooltip"
                     :data-tip="pre"
                     :class="{
-                      'bg-green-400': String(pre).toLowerCase() !== 'nil-vote',
-                      'bg-red-400': String(pre).toLowerCase() === 'nil-vote',
+                      'bg-success': String(pre).toLowerCase() !== 'nil-vote',
+                      'bg-error': String(pre).toLowerCase() === 'nil-vote',
                     }"
                     >&nbsp;</span
                   >
@@ -256,8 +264,8 @@ async function update() {
                     class="tooltip ml-1"
                     :data-tip="item.precommits[i]"
                     :class="{
-                      'bg-green-400': String(item.precommits[i]).toLowerCase() !== 'nil-vote',
-                      'bg-red-400': String(item.precommits[i]).toLowerCase() === 'nil-vote',
+                      'bg-success': String(item.precommits[i]).toLowerCase() !== 'nil-vote',
+                      'bg-error': String(item.precommits[i]).toLowerCase() === 'nil-vote',
                     }"
                     >&nbsp;</span
                   >
@@ -271,7 +279,7 @@ async function update() {
     </div>
 
     <!-- alert-info -->
-    <div class="text-[#00cfe8] bg-[rgba(0,207,232,0.12)] rounded shadow mt-4 alert-info">
+    <div class="text-info bg-info/10 rounded shadow mt-4 alert-info">
       <div class="drop-shadow-md px-4 pt-2 pb-2" style="box-shadow: rgba(0, 207, 232, 0.4) 0px 6px 15px -7px">
         <h2 class="text-base font-semibold">{{ $t('consensus.tips') }}</h2>
       </div>

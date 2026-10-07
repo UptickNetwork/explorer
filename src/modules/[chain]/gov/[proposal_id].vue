@@ -220,7 +220,7 @@ function metaItem(metadata: string | undefined): { title: string; summary: strin
         class="card-title flex flex-col md:!justify-between md:!flex-row mb-2"
       >
         <p class="truncate w-full">
-          {{ proposal_id }}. {{ proposal.title || proposal.content?.title || metaItem(proposal?.metadata)?.title }}
+          {{ proposal_id }}. {{ proposal.title }}
         </p>
         <div
           class="badge badge-ghost"
@@ -232,11 +232,11 @@ function metaItem(metadata: string | undefined): { title: string; summary: strin
       <div class="">
         <ObjectElement :value="proposal.content" />
       </div>
-      <div v-if="(proposal.summary && !proposal.content?.description) || metaItem(proposal?.metadata)?.summary">
+      <div v-if="proposal.summary">
         <MdEditor
           :model-value="
             format.multiLine(
-              proposal.summary || metaItem(proposal?.metadata)?.summary
+              proposal.summary
             )
           "
           previewOnly
@@ -260,7 +260,7 @@ function metaItem(metadata: string | undefined): { title: string; summary: strin
               :style="`width: ${item.value === '-' || item.value === 'NaN%' ? '0%' : item.value}`"
             ></div>
             <p
-              class="absolute inset-x-0 inset-y-0 text-center text-sm text-[#666] dark:text-[#eee] flex items-center justify-center"
+              class="absolute inset-x-0 inset-y-0 text-center text-sm text-base-content flex items-center justify-center"
             >
               {{ item.value }}
             </p>
@@ -380,7 +380,7 @@ function metaItem(metadata: string | undefined): { title: string; summary: strin
                 class="py-2 text-sm"
                 :class="{
                   'text-yes': item.option === 'VOTE_OPTION_YES',
-                  'text-gray-400': item.option === 'VOTE_OPTION_ABSTAIN',
+                  'text-base-content/60': item.option === 'VOTE_OPTION_ABSTAIN',
                 }"
               >
                 {{ String(item.option).replace('VOTE_OPTION_', '') }}

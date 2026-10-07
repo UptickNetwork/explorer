@@ -10,8 +10,11 @@ import type { AuthAccount, Delegation, TxResponse, DelegatorRewards, UnbondingRe
 import type { Coin } from '@cosmjs/amino';
 import Countdown from '@/components/Countdown.vue';
 import { fromBase64 } from '@cosmjs/encoding';
+import { useQRCode } from '@vueuse/integrations/useQRCode';
+import { isOfacSanctionedEvm } from '@/libs/ofac';
 
 const props = defineProps(['address', 'chain']);
+const addressQrCode = useQRCode(computed(() => String(props.address || '')));
 
 const blockchain = useBlockchain();
 const stakingStore = useStakingStore();
@@ -25,6 +28,12 @@ const balances = ref([] as Coin[]);
 const recentReceived = ref([] as TxResponse[]);
 const unbonding = ref([] as UnbondingResponses[]);
 const unbondingTotal = ref(0);
+const addressQrModal = ref(false);
+const addressCopied = ref(false);
+const publicKeyCopied = ref(false);
+const copiedTxHash = ref('');
+const EVM_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+const ofacSanctioned = ref(false);
 const chart = {};
 onMounted(() => {
   loadAccount(props.address);
@@ -32,20 +41,20 @@ onMounted(() => {
 const totalAmountByCategory = computed(() => {
   let sumDel = 0;
   delegations.value?.forEach((x) => {
-    sumDel += Number(x.balance.amount);
+    sumDel += format.tokenAmountNumber(x.balance);
   });
   let sumRew = 0;
   rewards.value?.total?.forEach((x) => {
-    sumRew += Number(x.amount);
+    sumRew += format.tokenAmountNumber(x);
   });
   let sumBal = 0;
   balances.value?.forEach((x) => {
-    sumBal += Number(x.amount);
+    sumBal += format.tokenAmountNumber(x);
   });
   let sumUn = 0;
   unbonding.value?.forEach((x) => {
     x.entries?.forEach((y) => {
-      sumUn += Number(y.balance);
+      sumUn += format.tokenAmountNumber({ amount: y.balance, denom: stakingStore.params.bond_denom });
     });
   });
   return [sumBal, sumDel, sumRew, sumUn];
@@ -101,6 +110,14 @@ function loadAccount(address: string) {
     });
   });
 
+  ofacSanctioned.value = false;
+  if (EVM_ADDRESS_RE.test(address)) {
+    // Best effort: never blocks or breaks the page; only a positive match is shown.
+    isOfacSanctionedEvm(address).then((listed) => {
+      if (props.address === address) ofacSanctioned.value = listed;
+    });
+  }
+
   const receivedQuery = `?&pagination.reverse=true&events=coin_received.receiver='${address}'&pagination.limit=5`;
   blockchain.rpc.getTxs(receivedQuery, {}).then((x) => {
     recentReceived.value = x.tx_responses;
@@ -109,6 +126,26 @@ function loadAccount(address: string) {
 
 function updateEvent() {
   loadAccount(props.address);
+}
+
+async function copyAddress() {
+  await navigator.clipboard.writeText(props.address);
+  addressCopied.value = true;
+  window.setTimeout(() => (addressCopied.value = false), 1200);
+}
+
+async function copyPublicKey(value: string) {
+  await navigator.clipboard.writeText(value);
+  publicKeyCopied.value = true;
+  window.setTimeout(() => (publicKeyCopied.value = false), 1200);
+}
+
+async function copyTxHash(hash: string) {
+  await navigator.clipboard.writeText(hash);
+  copiedTxHash.value = hash;
+  window.setTimeout(() => {
+    if (copiedTxHash.value === hash) copiedTxHash.value = '';
+  }, 1200);
 }
 
 function mapAmount(events: { type: string; attributes: { key: string; value: string }[] }[]) {
@@ -125,18 +162,65 @@ function mapAmount(events: { type: string; attributes: { key: string; value: str
     <div class="bg-base-100 px-4 pt-3 pb-4 rounded mb-4 shadow">
       <div class="flex items-center">
         <!-- img -->
-        <div class="inline-flex relative w-11 h-11 rounded-md">
+        <button
+          type="button"
+          class="inline-flex relative w-11 h-11 rounded-md"
+          aria-label="Show address QR code"
+          @click="addressQrModal = true"
+        >
           <div class="w-11 h-11 absolute rounded-md opacity-10 bg-primary"></div>
           <div class="w-full inline-flex items-center align-middle flex-none justify-center">
             <Icon icon="mdi-qrcode" class="text-primary" style="width: 27px; height: 27px" />
           </div>
-        </div>
+        </button>
         <!-- content -->
         <div class="flex flex-1 flex-col truncate pl-4">
           <h2 class="text-sm card-title">{{ $t('account.address') }}:</h2>
-          <span class="text-xs truncate"> {{ address }}</span>
+          <div class="flex items-center gap-1 overflow-hidden">
+            <span class="text-xs truncate">{{ address }}</span>
+            <button
+              type="button"
+              class="btn btn-ghost btn-xs shrink-0"
+              :aria-label="addressCopied ? 'Address copied' : 'Copy address'"
+              @click="copyAddress"
+            >
+              <Icon :icon="addressCopied ? 'mdi-check' : 'mdi-content-copy'" class="text-sm" />
+            </button>
+          </div>
+          <div v-if="ofacSanctioned" class="mt-1">
+            <span
+              class="badge badge-error badge-sm gap-1"
+              title="Listed on the OFAC SDN list (source: github.com/0xB10C/ofac-sanctioned-digital-currency-addresses)"
+            >
+              <Icon icon="mdi-alert" class="h-3 w-3" />
+              OFAC sanctioned
+            </span>
+          </div>
         </div>
       </div>
+    </div>
+
+    <input v-model="addressQrModal" type="checkbox" class="modal-toggle" />
+    <div class="modal" role="dialog" aria-labelledby="address-qr-title">
+      <div class="modal-box max-w-sm text-center">
+        <div class="flex items-center justify-between">
+          <h2 id="address-qr-title" class="text-xl font-semibold">Account Address</h2>
+          <button
+            type="button"
+            class="btn btn-circle btn-ghost btn-sm"
+            aria-label="Close"
+            @click="addressQrModal = false"
+          >
+            ✕
+          </button>
+        </div>
+        <img :src="addressQrCode" alt="Account address QR code" class="mx-auto my-6 h-64 w-64 rounded" />
+        <button type="button" class="flex w-full items-center justify-center gap-2 break-all text-sm" @click="copyAddress">
+          <span>{{ address }}</span>
+          <Icon :icon="addressCopied ? 'mdi-check' : 'mdi-content-copy'" class="shrink-0" />
+        </button>
+      </div>
+      <button type="button" class="modal-backdrop" aria-label="Close" @click="addressQrModal = false"></button>
     </div>
 
     <!-- Assets -->
@@ -182,10 +266,10 @@ function mapAmount(events: { type: string; attributes: { key: string; value: str
                   {{ format.formatToken(balanceItem) }}
                 </div>
                 <div class="text-xs">
-                  {{ format.calculatePercent(balanceItem.amount, totalAmount) }}
+                  {{ format.calculatePercent(format.tokenAmountNumber(balanceItem), totalAmount) }}
                 </div>
               </div>
-              <div class="text-xs truncate relative py-1 px-3 rounded-full w-fit text-primary dark:invert mr-2">
+              <div class="text-xs truncate relative py-1 px-3 rounded-full w-fit text-primary mr-2">
                 <span class="inset-x-0 inset-y-0 opacity-10 absolute bg-primary dark:invert text-sm"></span>
                 ${{ format.tokenValue(balanceItem) }}
               </div>
@@ -201,10 +285,10 @@ function mapAmount(events: { type: string; attributes: { key: string; value: str
                   {{ format.formatToken(delegationItem?.balance) }}
                 </div>
                 <div class="text-xs">
-                  {{ format.calculatePercent(delegationItem?.balance?.amount, totalAmount) }}
+                  {{ format.calculatePercent(format.tokenAmountNumber(delegationItem?.balance), totalAmount) }}
                 </div>
               </div>
-              <div class="text-xs truncate relative py-1 px-3 rounded-full w-fit text-primary dark:invert mr-2">
+              <div class="text-xs truncate relative py-1 px-3 rounded-full w-fit text-primary mr-2">
                 <span class="inset-x-0 inset-y-0 opacity-10 absolute bg-primary dark:invert text-sm"></span>
                 ${{ format.tokenValue(delegationItem?.balance) }}
               </div>
@@ -220,10 +304,10 @@ function mapAmount(events: { type: string; attributes: { key: string; value: str
                   {{ format.formatToken(rewardItem) }}
                 </div>
                 <div class="text-xs">
-                  {{ format.calculatePercent(rewardItem.amount, totalAmount) }}
+                  {{ format.calculatePercent(format.tokenAmountNumber(rewardItem), totalAmount) }}
                 </div>
               </div>
-              <div class="text-xs truncate relative py-1 px-3 rounded-full w-fit text-primary dark:invert mr-2">
+              <div class="text-xs truncate relative py-1 px-3 rounded-full w-fit text-primary mr-2">
                 <span class="inset-x-0 inset-y-0 opacity-10 absolute bg-primary dark:invert text-sm"></span>${{
                   format.tokenValue(rewardItem)
                 }}
@@ -245,10 +329,18 @@ function mapAmount(events: { type: string; attributes: { key: string; value: str
                   }}
                 </div>
                 <div class="text-xs">
-                  {{ format.calculatePercent(unbondingTotal, totalAmount) }}
+                  {{
+                    format.calculatePercent(
+                      format.tokenAmountNumber({
+                        amount: String(unbondingTotal),
+                        denom: stakingStore.params.bond_denom,
+                      }),
+                      totalAmount
+                    )
+                  }}
                 </div>
               </div>
-              <div class="text-xs truncate relative py-1 px-3 rounded-full w-fit text-primary dark:invert mr-2">
+              <div class="text-xs truncate relative py-1 px-3 rounded-full w-fit text-primary mr-2">
                 <span class="inset-x-0 inset-y-0 opacity-10 absolute bg-primary dark:invert"></span>
                 ${{
                   format.tokenValue({
@@ -442,17 +534,28 @@ function mapAmount(events: { type: string; attributes: { key: string; value: str
               <td class="text-sm py-3">
                 <RouterLink
                   :to="`/${chain}/block/${v.height}`"
-                  class="text-primary dark:invert"
+                  class="text-primary"
                   >{{ v.height }}</RouterLink
                 >
               </td>
               <td class="truncate py-3" style="max-width: 200px">
-                <RouterLink
-                  :to="`/${chain}/tx/${v.txhash}`"
-                  class="text-primary dark:invert"
-                >
-                  {{ v.txhash }}
-                </RouterLink>
+                <div class="flex items-center gap-1 overflow-hidden">
+                  <RouterLink
+                    :to="`/${chain}/tx/${v.txhash}`"
+                    class="truncate text-primary"
+                    :title="v.txhash"
+                  >
+                    {{ v.txhash }}
+                  </RouterLink>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs shrink-0"
+                    :aria-label="copiedTxHash === v.txhash ? 'Transaction hash copied' : 'Copy transaction hash'"
+                    @click="copyTxHash(v.txhash)"
+                  >
+                    <Icon :icon="copiedTxHash === v.txhash ? 'mdi-check' : 'mdi-content-copy'" class="h-4 w-4" />
+                  </button>
+                </div>
               </td>
               <td class="flex items-center py-3">
                 <div class="mr-2">
@@ -494,17 +597,28 @@ function mapAmount(events: { type: string; attributes: { key: string; value: str
               <td class="text-sm py-3">
                 <RouterLink
                   :to="`/${chain}/block/${v.height}`"
-                  class="text-primary dark:invert"
+                  class="text-primary"
                   >{{ v.height }}</RouterLink
                 >
               </td>
               <td class="truncate py-3" style="max-width: 200px">
-                <RouterLink
-                  :to="`/${chain}/tx/${v.txhash}`"
-                  class="text-primary dark:invert"
-                >
-                  {{ v.txhash }}
-                </RouterLink>
+                <div class="flex items-center gap-1 overflow-hidden">
+                  <RouterLink
+                    :to="`/${chain}/tx/${v.txhash}`"
+                    class="truncate text-primary"
+                    :title="v.txhash"
+                  >
+                    {{ v.txhash }}
+                  </RouterLink>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs shrink-0"
+                    :aria-label="copiedTxHash === v.txhash ? 'Transaction hash copied' : 'Copy transaction hash'"
+                    @click="copyTxHash(v.txhash)"
+                  >
+                    <Icon :icon="copiedTxHash === v.txhash ? 'mdi-check' : 'mdi-content-copy'" class="h-4 w-4" />
+                  </button>
+                </div>
               </td>
               <td class="flex items-center py-3">
                 <div class="mr-2">
@@ -526,7 +640,58 @@ function mapAmount(events: { type: string; attributes: { key: string; value: str
     <!-- Account -->
     <div class="bg-base-100 px-4 pt-3 pb-4 rounded mb-4 shadow">
       <h2 class="card-title mb-4">{{ $t('account.acc') }}</h2>
-      <DynamicComponent :value="account" />
+      <div class="overflow-x-auto">
+        <table class="table w-full text-sm">
+          <tbody>
+            <template v-for="(value, key) in account" :key="key">
+              <template v-if="key === 'pub_key' && value && typeof value === 'object' && typeof value.key === 'string'">
+                <tr>
+                  <td class="w-1/5 capitalize">Pub Key Type</td>
+                  <td>{{ value['@type'] }}</td>
+                </tr>
+                <tr>
+                  <td class="w-1/5 capitalize">Pub Key</td>
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <span class="break-all">{{ value.key }}</span>
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-xs shrink-0"
+                        :aria-label="publicKeyCopied ? 'Public key copied' : 'Copy public key'"
+                        :title="publicKeyCopied ? 'Copied' : 'Copy public key'"
+                        @click="copyPublicKey(value.key)"
+                      >
+                        <Icon :icon="publicKeyCopied ? 'mdi-check' : 'mdi-content-copy'" class="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr v-else-if="key === 'address'">
+                <td class="w-1/5 capitalize">Address</td>
+                <td>
+                  <div class="flex items-center gap-2">
+                    <span class="break-all">{{ value }}</span>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-xs shrink-0"
+                      :aria-label="addressCopied ? 'Address copied' : 'Copy address'"
+                      :title="addressCopied ? 'Copied' : 'Copy address'"
+                      @click="copyAddress"
+                    >
+                      <Icon :icon="addressCopied ? 'mdi-check' : 'mdi-content-copy'" class="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-else>
+                <td class="w-1/5 capitalize">{{ String(key).replaceAll('_', ' ') }}</td>
+                <td><DynamicComponent :value="value" /></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
   <div v-else class="text-no text-sm">{{ $t('account.error') }}</div>
