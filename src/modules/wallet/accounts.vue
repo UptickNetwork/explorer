@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { CosmosRestClient } from '@/libs/client';
-import { useBlockchain, useDashboard, useFormatter } from '@/stores';
+import { useBlockchain, useDashboard, useFormatter, useStorageStore } from '@/stores';
 import type { Coin, CoinWithPrice, Delegation } from '@/types';
 import { fromBech32, toBase64, toBech32, toHex } from '@cosmjs/encoding';
 import { Icon } from '@iconify/vue';
@@ -12,12 +12,13 @@ import AdBanner from '@/components/ad/AdBanner.vue';
 const dashboard = useDashboard();
 const chainStore = useBlockchain();
 const format = useFormatter();
+const storageStore = useStorageStore();
 const sourceAddress = ref(''); //
 const sourceHdPath = ref("m/44/118/0'/0/0"); //
 const selectedSource = ref({} as LocalKey); //
 const importStep = ref('step1');
 
-const conf = ref(JSON.parse(localStorage.getItem('imported-addresses') || '{}') as Record<string, AccountEntry[]>);
+const conf = ref(JSON.parse(storageStore.currentStorage.getItem('imported-addresses') || localStorage.getItem('imported-addresses') || '{}') as Record<string, AccountEntry[]>);
 const balances = ref({} as Record<string, CoinWithPrice[]>);
 const delegations = ref({} as Record<string, Delegation[]>);
 
@@ -136,7 +137,7 @@ function removeAddress(addr: string) {
     if (acc.length > 0) newConf[key] = acc;
   });
   conf.value = newConf;
-  localStorage.setItem('imported-addresses', JSON.stringify(conf.value));
+  storageStore.currentStorage.setItem('imported-addresses', JSON.stringify(conf.value));
 }
 
 // add address to the local list
@@ -164,7 +165,7 @@ async function addAddress(acc: AccountEntry) {
     loadBalances(acc.chainName, acc.endpoint, acc.address);
   }
 
-  localStorage.setItem('imported-addresses', JSON.stringify(conf.value));
+  storageStore.currentStorage.setItem('imported-addresses', JSON.stringify(conf.value));
 }
 
 // load balances for an address
@@ -186,9 +187,9 @@ async function loadBalances(chainName: string, endpoint: string, address: string
         <div class="min-w-0">
           <h2 class="text-2xl font-bold leading-7 sm:!truncate sm:!text-3xl sm:!tracking-tight">Accounts</h2>
           <div class="mt-1 flex flex-col sm:!mt-0 sm:!flex-row sm:!flex-wrap sm:!space-x-6">
-            <div class="mt-2 items-center text-sm text-gray-500 hidden md:!flex">
+            <div class="mt-2 items-center text-sm text-base-content/70 hidden md:!flex">
               <svg
-                class="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400"
+                class="mr-1.5 h-5 w-5 flex-shrink-0 text-base-content/60"
                 viewBox="0 0 20 20"
                 fill="currentColor"
                 aria-hidden="true"
@@ -231,7 +232,8 @@ async function loadBalances(chainName: string, endpoint: string, address: string
         <div class="flex justify-self-center">
           <div class="mx-2 p-2">
             <svg
-              :fill="chainStore.current?.themeColor || '#666CFF'"
+              :fill="chainStore.current?.themeColor || 'currentColor'"
+              class="text-primary"
               height="28px"
               width="28px"
               version="1.1"
@@ -351,9 +353,9 @@ async function loadBalances(chainName: string, endpoint: string, address: string
       <div class="text-center bg-base-100 rounded-md my-4 p-4">
         <a
           href="#address-modal"
-          class="inline-flex items-center ml-3 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+          class="inline-flex items-center ml-3 rounded-md bg-base-100 px-3 py-2 text-sm font-semibold text-base-content shadow-sm ring-1 ring-inset ring-base-300 hover:bg-active"
         >
-          <svg class="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <svg class="-ml-0.5 mr-1.5 h-5 w-5 text-base-content/60" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path
               d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z"
             />
@@ -404,7 +406,7 @@ async function loadBalances(chainName: string, endpoint: string, address: string
                       :class="acc.compatiable ? 'tooltip-success' : 'tooltip-error'"
                       :data-tip="`Coin Type: ${acc.coinType}`"
                     >
-                      <div class="font-bold capitalize" :class="acc.compatiable ? 'text-green-500' : 'text-red-500'">
+                      <div class="font-bold capitalize" :class="acc.compatiable ? 'text-success' : 'text-error'">
                         {{ acc.chainName }}
                       </div>
                     </div>
